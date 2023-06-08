@@ -165,36 +165,7 @@ bool smartDrive(directionType dir, float dist) {
   setDriveSpeed(maxVelocity);
   return true;
 }
-void brainTrauma() {
-  float e = 0;
-  float d = 0;
-  float i = 0;
-  float eRec = 0;
-  float kp = 0.75;
-  float kd = 0.5;
-  float ki = 0.5;
-  float dt = 0.05;
-  float setpoint = inertialSensor.rotation(deg);
-  frontLeft.spin(fwd,maxVelocity,pct);
-  frontRight.spin(fwd,maxVelocity,pct);
-  wait(dt,sec);
-  while(distanceSensor.value()>200) {
-    e = setpoint-inertialSensor.rotation(deg);
-    d = (e-eRec)/dt;
-    i += e*dt;
-    eRec = e;
-    frontLeft.setVelocity(frontRight.velocity(rpm) + e*kp + d*kd + i*ki,rpm);
-    
-    frontLeft.spin(fwd);
-    frontRight.spin(fwd);
-    wait(dt,sec);
-    Controller.Screen.newLine();
-    Controller.Screen.print("%.2f %.2f %.2f", e, inertialSensor.rotation(deg), i);
-    Controller.Screen.newLine();
-  }
-  frontLeft.stop();
-  frontRight.stop();
-}
+
 void simpleTurn(float rot) {
   float wheelRot = kr*rot*robotRadius/wheelRadius;
   frontLeft.rotateFor(fwd, wheelRot, deg,false);
@@ -315,40 +286,31 @@ void colors() {
 }
 
 //ASHWIN CODE
-void turnToHeading(double targetHeading){
-  double turnkP = .4;
-  double turnkI= .0;
-  double turnkD = .3;
+void turnToHeading(float targetHeading){
+  float turnkP = .4;
+  float turnkI = .0;
+  float turnkD = .0;
 
-  double turnErrorTolerance = 1.0;
+  float turnErrorTolerance = 1.0;
 
 
   int desiredValue = 200;
   int desiredTurnValue = 0;
 
-  double error;
-  double prevError = 0;
-  double integral = 0;
-  double derivative=0;
-  double integralResetThreshold = 20;
-  double targetHeading;
-  double forwardSpeed = 50;
-  double errorTolerance = 2.0;
+  float error;
+  float prevError = 0;
+  float integral = 0;
+  float derivative = 0;
+  float timeInterval = 0.025;
+  float forwardSpeed = 50;
 
-  error = targetHeading - inertialSensor.rotation(degrees);
+  error = targetHeading - inertialSensor.rotation(degrees)%360;
 
   while(abs(error) > 1){
-    error = targetHeading - inertialSensor.rotation(degrees);
-    integral += error;
-    if (error == 0 || error < 0){
-      integral = 0;
-
-    }
-    if(error > 8){
-      integral = 0;
-    }
-    derivative = error - prevError;
-    double output = ((turnkP * error) + (turnkI * integral) + (derivative * turnkD));
+    error = targetHeading - inertialSensor.rotation(degrees)%360;
+    integral += error * timeInterval;
+    derivative = (error - prevError) / timeInterval;
+    float output = ((turnkP * error) + (turnkI * integral) + (derivative * turnkD));
     frontLeft.setVelocity(-output, pct);
     backLeft.setVelocity(-output, pct);
     frontRight.setVelocity(output, pct);
@@ -358,7 +320,7 @@ void turnToHeading(double targetHeading){
     backLeft.spin(forward);
     frontRight.spin(forward);
     backRight.spin(forward);
-    wait(8, msec);
+    wait(timeInterval, sec);
   }
     frontLeft.stop();
     backLeft.stop();
@@ -367,91 +329,26 @@ void turnToHeading(double targetHeading){
 }
 
 void driveForward(double targetDistance) {
-  double turnkP = .4;
-  double turnkI= .0;
-  double turnkD = .3;
+  float turnkP = .4;
+  float turnkI= .2;
+  float turnkD = .1;
+  float distkP = .15;
+  
+  float error;
+  float prevError = 0;
+  float integral = 0;
+  float derivative = 0;
+  float timeInterval = 0.025;
+  float forwardSpeed = 50;
 
-  double turnErrorTolerance = 1.0;
-
-
-  int desiredValue = 200;
-  int desiredTurnValue = 0;
-
-  double error;
-  double prevError = 0;
-  double integral = 0;
-  double derivative=0;
-  double integralResetThreshold = 20;
-  double targetHeading;
-  double forwardSpeed = 50;
-  double errorTolerance = 2.0;
-
-  // reset the encoders
-  rotationSensor.resetPosition();
-  // start the motors at the beginning
-  frontLeft.setVelocity(forwardSpeed, pct); 
-  backLeft.setVelocity(forwardSpeed, pct);
-  frontRight.setVelocity(forwardSpeed, pct);
-  backRight.setVelocity(forwardSpeed, pct); 
-
-  double traveledDistance = 0;
-  double wheelDiameter = 4.0; // inches
+  float traveledDistance = 0;
+  float wheelDiameter = 4.0; // inches
   double wheelCircumference = wheelDiameter * M_PI; // inches
-  double currentRotation = 0;
-  double lastRotation = currentRotation;
-  int y=0;
+  float currentRotation = 0;
+  float lastRotation = currentRotation;
   while (traveledDistance < targetDistance) {
-    // check if target distance has already been reached and stop the motors if it has
-    if (abs(traveledDistance - targetDistance) < .5) {
-      frontLeft.stop();
-      backLeft.stop();
-      frontRight.stop();
-      backRight.stop();
-      break; // exit the loop early
-    }
-    else{
-      double output = (traveledDistance - targetDistance) * 6;
-      frontLeft.setVelocity(output, pct);
-      backLeft.setVelocity(output, pct);
-      frontRight.setVelocity(output, pct);
-      backRight.setVelocity(output, pct);
-    }
 
-    currentRotation = rotationSensor.position(degrees);
-    printf("iteration,curr,prev %d, %f,%f,%f \n",y++, currentRotation, lastRotation, traveledDistance);
-    double rotationDelta = currentRotation - lastRotation;
-    lastRotation = currentRotation;
-    
-    double rawDistance = rotationDelta * (wheelCircumference / 360.0);
-    double distance = (rawDistance >= 0) ? rawDistance : 0.0;
-
-    // Check for overshooting and adjust direction
-    if (traveledDistance + distance > targetDistance) {
-       double overshootDistance = targetDistance - traveledDistance;
-       distance = (rawDistance > 0) ? overshootDistance : -overshootDistance;
-    }
-    
-    // Update traveled distance and move robot
-    traveledDistance += distance;
-    if (distance >= 0) {
-      // Move forward
-      frontLeft.spin(forward);
-      backLeft.spin(forward);
-      frontRight.spin(forward);
-      backRight.spin(forward);
-
-      
-
-    } else if (distance < 0) {
-      // Move backward
-      frontLeft.spin(reverse);
-      backLeft.spin(reverse);
-      frontRight.spin(reverse);
-      backRight.spin(reverse);
-    }
-    // printf("traveledDistance: %f \n", traveledDistance );
-    // printf("traveledDistance: %f, distance: %f, rawDistance: %f\n", traveledDistance, distance, rawDistance);
-    wait(10, msec);
+    wait(timeInterval, sec);
   }
 
   // Stop motors and wait
@@ -460,33 +357,6 @@ void driveForward(double targetDistance) {
   frontRight.stop();
   backRight.stop();
 } 
-
-void slam() {
-  //made by Sam
-  frontLeft.spin(forward);
-  frontRight.spin(forward);
-  while(true) {
-    if(distanceSensor.value()<175) {
-      frontLeft.stop();
-      frontRight.stop();
-      break;
-  }
-  }
-  
-  
-}
-void distanceTest() {
-  //alex made this one
-  for(int i=0; i<3; i++) {
-    frontLeft.spin(forward);
-    frontRight.spin(forward);
-    while(distanceSensor.value()>175);
-    frontLeft.stop();
-    frontRight.stop();
-    simpleDrive(reverse, 3);
-    simpleTurn(90);
-  }
-}
 
 int main() {
   // Initializing Robot Configuration. DO NOT REMOVE!
